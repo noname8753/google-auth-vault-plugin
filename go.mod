@@ -1,4 +1,4 @@
-module noname8753/google-aut-vault-plugin
+module github.com/noname8753/google-aut-vault-plugin
 
 go 1.13
 
