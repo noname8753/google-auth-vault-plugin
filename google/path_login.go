@@ -10,8 +10,8 @@ import (
 	"google.golang.org/api/admin/directory/v1"
 	goauth "google.golang.org/api/oauth2/v2"
 
-	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 const (
@@ -148,7 +148,7 @@ func (b *backend) pathRenew(ctx context.Context, req *logical.Request, d *framew
 	return resp, nil
 }
 
-func setGroups(auth *logical.Auth, user *goauth.Userinfoplus, groups []*admin.Group) {
+func setGroups(auth *logical.Auth, user *goauth.Userinfo, groups []*admin.Group) {
 	// add every associated group
 	for _, group := range groups {
 		auth.GroupAliases = append(auth.GroupAliases, &logical.Alias{
@@ -167,7 +167,7 @@ func setGroups(auth *logical.Auth, user *goauth.Userinfoplus, groups []*admin.Gr
 	})
 }
 
-func (b *backend) authenticate(ctx context.Context, config *config, token *oauth2.Token, authType string) (*goauth.Userinfoplus, []*admin.Group, error) {
+func (b *backend) authenticate(ctx context.Context, config *config, token *oauth2.Token, authType string) (*goauth.Userinfo, []*admin.Group, error) {
 	oauth2config := config.oauth2Config(authType)
 
 	user, err := b.user.authUser(ctx, oauth2config, token)

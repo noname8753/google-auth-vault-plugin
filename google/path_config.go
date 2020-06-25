@@ -14,8 +14,8 @@ import (
 	"google.golang.org/api/admin/directory/v1"
 	goauth "google.golang.org/api/oauth2/v2"
 
-	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 const (
@@ -290,7 +290,7 @@ func (c *config) ttlForType(authType string) (ttl time.Duration, maxTTL time.Dur
 	return ttl, maxTTL
 }
 
-func (c *config) authorised(user *goauth.Userinfoplus, groups []*admin.Group) bool {
+func (c *config) authorised(user *goauth.Userinfo, groups []*admin.Group) bool {
 
 	// base case, no restrictions configured
 	if (len(c.AllowedDomains) + len(c.AllowedGroups) + len(c.AllowedUsers)) == 0 {

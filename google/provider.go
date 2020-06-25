@@ -16,7 +16,7 @@ type googleProvider struct {
 
 // UserProvider does the authentication of user with oauth2
 type UserProvider interface {
-	authUser(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (*goauth.Userinfoplus, error)
+	authUser(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (*goauth.Userinfo, error)
 	oauth2Exchange(ctx context.Context, code string, config *oauth2.Config) (*oauth2.Token, error)
 }
 
@@ -32,7 +32,7 @@ func (p *googleProvider) oauth2Exchange(ctx context.Context, code string, config
 	return config.Exchange(ctx, code)
 }
 
-func (p *googleProvider) authUser(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (*goauth.Userinfoplus, error) {
+func (p *googleProvider) authUser(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (*goauth.Userinfo, error) {
 	client := config.Client(ctx, token)
 	userService, err := goauth.New(client)
 	if err != nil {
