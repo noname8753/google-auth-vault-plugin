@@ -1,6 +1,6 @@
-FROM golang:1.12.17 AS build
+FROM golang:1.13.12 AS build
 
-WORKDIR /go/src/github.com/simonswine/vault-plugin-auth-google
+WORKDIR /go/src/github.com/noname8753/vault-plugin-auth-google
 
 ADD go.mod go.sum ./
 

@@ -23,6 +23,7 @@ func main() {
 		TLSProviderFunc:    tlsProviderFunc,
 	})
 	if err != nil {
+    log.Println("Error")
 		log.Println(err)
 		os.Exit(1)
 	}

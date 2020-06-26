@@ -2,7 +2,7 @@ package google
 
 import (
 	"context"
-
+//	"fmt"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -19,7 +19,7 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 const googleBackendHelp = `
 The Google credential provider allows you to authenticate with Google.
 
-Documentation can be found at https://github.com/grapeshot/google-auth-vault-plugin.
+Documentation can be found at https://github.com/noname8753/google-auth-vault-plugin.
 `
 
 // Backend for google

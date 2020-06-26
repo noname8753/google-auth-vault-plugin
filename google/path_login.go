@@ -23,7 +23,7 @@ const (
 func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	code := data.Get(googleAuthCodeParameterName).(string)
 
-	config, err := b.config(ctx, req.Storage)
+  config, err := b.config(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}

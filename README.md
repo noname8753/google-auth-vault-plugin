@@ -22,7 +22,7 @@ you use the published checksums to verify integrity.
 
    ```sh
    $ export SHA256=$(shasum -a 256 "/etc/vault/plugins/google-auth-vault-plugin" | cut -d' ' -f1)
-   $ vault write sys/plugins/catalog/google-auth-vault-plugin \
+   $ vault write sys/plugins/catalog/auth/google-auth-vault-plugin \
        sha_256="${SHA256}" \
        command="google-auth-vault-plugin"
    ```
@@ -30,10 +30,38 @@ you use the published checksums to verify integrity.
 1. Mount the auth method:
 
    ```sh
-   $ vault auth-enable \
+   $ vault auth enable \
        -path="google" \
        -plugin-name="google-auth-vault-plugin" plugin
    ```
+   ```sh
+   $ vault auth enable \
+       -path="auth/google" \
+       -plugin-name="google-auth-vault-plugin" plugin   
+   ``` 
+   ```sh
+   $ vault read auth/google/config
+
+    Key                              Value
+    ---                              -----
+    allowed_domains                  []
+    allowed_groups                   <nil>
+    allowed_users                    []
+    cli_client_id                    <>
+    cli_client_secret                <redacted>
+    cli_max_ttl                      0s
+    cli_ttl                          0s
+    directory_impersonate_user       n/a
+    directory_service_account_key    n/a
+    web_client_id                    <>
+    web_client_secret                <redacted>
+    web_max_ttl                      0s
+    web_redirect_url                 n/a
+    web_ttl                          0s
+  ```
+
+
+
 
 1. Create an OAuth client ID in [the Google Cloud Console](https://console.cloud.google.com/apis/credentials), of type "Other".
 
@@ -41,9 +69,17 @@ you use the published checksums to verify integrity.
 
    ```sh
    $ vault write auth/google/config \
-       client_id=<GOOGLE_CLIENT_ID> \
-       client_secret=<GOOGLE_CLIENT_SECRET>
+       web_client_id=<GOOGLE_CLIENT_ID> \
+       web_client_secret=<GOOGLE_CLIENT_SECRET>
    ```
+
+   ```sh
+   $ vault write auth/google/config \
+       cli_client_id=<GOOGLE_CLIENT_ID> \
+       cli_client_secret=<GOOGLE_CLIENT_SECRET>
+   ```
+
+
 
 1. Create a role for a given set of Google users mapping to a set of policies:
 
