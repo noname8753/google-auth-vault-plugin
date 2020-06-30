@@ -88,9 +88,10 @@ func newBackend() *backend {
 					logical.ReadOperation: b.pathWebCodeURL,
 				},
 			},
+      pathUsers(b),
+      pathUsersList(b),
 		}),
 	}
-
 	return b
 }
 

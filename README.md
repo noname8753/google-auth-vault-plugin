@@ -4,6 +4,8 @@ A HashiCorp Vault plugin for Google Auth.
 
 ## Setup
 
+NOTE: This is a work-in-progress/cleanup.
+
 The setup guide assumes some familiarity with Vault and Vault's plugin
 ecosystem. You must have a Vault server already running, unsealed, and
 authenticated.
@@ -28,7 +30,7 @@ you use the published checksums to verify integrity.
    ```
 
 1. Mount the auth method:
-
+   #(Had to enable in both paths at the moment. This entire plugin needs a rewrite.)
    ```sh
    $ vault auth enable \
        -path="google" \
@@ -59,7 +61,40 @@ you use the published checksums to verify integrity.
     web_redirect_url                 n/a
     web_ttl                          0s
   ```
+  ```sh
+  vault path-help auth/google
 
+  ## DESCRIPTION
+
+  The Google credential provider allows you to authenticate with Google.
+
+  Documentation can be found at https://github.com/noname8753/google-auth-vault-plugin.
+
+  ## PATHS
+
+  The following paths are supported by this backend. To view help for
+  any of the paths below, use the help command with any route matching
+  the path pattern. Note that depending on the policy of your auth token,
+  you may or may not be able to access certain paths.
+
+    ^cli_code_url$
+
+
+    ^config$
+
+
+    ^login$
+
+
+    ^users/(?P<name>.+)$
+        Manage additional groups for users allowed to authenticate.
+
+    ^users/?$
+        Manage additional groups for users allowed to authenticate.
+
+    ^web_code_url$
+
+  ```
 
 
 
@@ -80,44 +115,43 @@ you use the published checksums to verify integrity.
    ```
 
 
+1. Allow domains/users
+  ```sh
+  vault write auth/google/config allowed_domains="someemail.com"
+  vault write auth/google/config allowed_users="someuser@someemail.com"
 
-1. Create a role for a given set of Google users mapping to a set of policies:
+  ``` 
+1. Set allowed callback (if using web redirect/compliing the webui with the patches) - Optional
+  ```sh
+  vault write auth/google/config web_redirect_url="http://127.0.0.1:8200"
+  ```
 
-   Create a policy called hello: [vault polices](https://www.vaultproject.io/intro/getting-started/policies.html)
+1. Write a policy
 
-   ```sh
-   $ vault write auth/google/role/hello \
-       bound_domain=<DOMAIN> \
-       bound_emails=myuseremail@<DOMAIN>,otheremail@<DOMAIN> \
-       policies=hello
-   ```
+  ```sh
+  vault policy write admin admin-policy.hcl
+  ```
 
-   The plugin can also map users to policies via Google Groups; however you need to consider how groups are retrieved and whether having administative permissions for the plugin is acceptable.
+1. Attach said policy to user
 
-   **Use with caution.**
+  ```sh
+  vault write auth/google/users/someuser@ssomeemail.com policies=admin
 
-   Alternative auth method with groups enabled:
-   ```sh
-   $ vault write auth/google/config \
-       client_id=<GOOGLE_CLIENT_ID> \
-       client_secret=<GOOGLE_CLIENT_SECRET> \
-       fetch_groups=true
-   ```
+  or
 
-   Create a role for a Google group mapping to a set of policies:
-   ```sh
-   $ vault write auth/google/role/hello \
-       bound_domain=<DOMAIN> \
-       bound_groups=SecurityTeam,WebTeam \
-       policies=hello
-   ```
+  vault write auth/google/users/someuser@ssomeemail.com policies=admin,default
+  ```
+
+
 
 1. Login using Google credentials (NB we use `open` to navigate to the Google Auth URL to get the code).
+   (No token is returned if user has no attached policy)
 
    ```sh
-   $ open $(vault read -field=url auth/google/code_url)
-   $ vault write auth/google/login code=$GOOGLE_CODE role=hello
+   $ open $(vault read -field=url auth/google/cli_code_url)
+   $ vault write auth/google/login code=$GOOGLE_CODE
    ```
+
 
 ## Notes
 

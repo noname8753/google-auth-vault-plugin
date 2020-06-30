@@ -78,12 +78,23 @@ func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *fra
 
 	ttl, maxTTL := config.ttlForType(authType)
 
+  var policies []string
+  p, err := b.User(ctx, req.Storage, user.Email)
+  if err != nil {
+    return nil, err
+  }
+  if p == nil {
+    return nil, nil
+  }
+
+  policies = p.Policies
 	resp := &logical.Response{
 		Auth: &logical.Auth{
 			InternalData: map[string]interface{}{
 				"token": encodedToken,
 				"type":  authType,
 			},
+      Policies: policies,
 			Metadata: map[string]string{
 				"username": user.Email,
 				"domain":   user.Hd,
@@ -106,6 +117,7 @@ func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *fra
 		},
 	}
 
+  //need to map policies here resp.Auth.Policies []string `json:"policies" mapstructure:"policies" structs:"policies"`
 	setGroups(resp.Auth, user, groups)
 
 	return resp, nil
