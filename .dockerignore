@@ -4,6 +4,7 @@ vendor/
 tags/
 test/
 google-auth-vault-plugin
+vault-plugin-auth-google
 .git/
 Makefile
 Dockerfile

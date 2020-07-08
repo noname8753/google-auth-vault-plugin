@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/plugin"
 
-	"github.com/noname8753/google-auth-vault-plugin/google"
+	google "github.com/noname8753/vault-plugin-auth-google"
 )
 
 func main() {
@@ -23,7 +23,6 @@ func main() {
 		TLSProviderFunc:    tlsProviderFunc,
 	})
 	if err != nil {
-    log.Println("Error")
 		log.Println(err)
 		os.Exit(1)
 	}

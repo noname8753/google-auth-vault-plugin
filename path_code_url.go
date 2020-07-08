@@ -1,3 +1,4 @@
+//Credit to https://github.com/simonswine/vault-plugin-auth-google
 package google
 
 import (
@@ -13,8 +14,6 @@ import (
 )
 
 const (
-	webCodeURLPath              = "web_code_url"
-	cliCodeURLPath              = "cli_code_url"
 	codeURLResponsePropertyName = "url"
 	typeWeb                     = "web"
 	typeCLI                     = "cli"
@@ -24,6 +23,32 @@ type state struct {
 	Type    string    `json:"type"` // web or cli
 	Created time.Time `json:"created"`
 }
+
+func (b *backend) cliCodeURLPath() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "cli_code_url",
+			Fields:  map[string]*framework.FieldSchema{},
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ReadOperation: b.pathCLICodeURL,
+			},
+		},
+	}
+}
+
+
+func (b *backend) webCodeURLPath() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "web_code_url",
+			Fields:  map[string]*framework.FieldSchema{},
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ReadOperation: b.pathWebCodeURL,
+			},
+		},
+	}
+}
+
 
 func (b *backend) statePath(stateValue string) string {
 	return fmt.Sprintf("state/%s", stateValue)

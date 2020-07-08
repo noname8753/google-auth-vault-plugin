@@ -1,29 +1,50 @@
+//Credit to https://github.com/simonswine/vault-plugin-auth-google
 package google
 
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
+
 
 	"golang.org/x/oauth2"
-	"google.golang.org/api/admin/directory/v1"
 	goauth "google.golang.org/api/oauth2/v2"
-
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
 const (
-	loginPath                   = "login"
 	googleAuthCodeParameterName = "code"
 	stateParameterName          = "state"
 )
 
+func (b *backend) loginPath() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "login",
+			Fields: map[string]*framework.FieldSchema{
+				googleAuthCodeParameterName: &framework.FieldSchema{
+					Type:        framework.TypeString,
+					Description: "Google authentication code. Required.",
+				},
+				stateParameterName: {
+					Type:        framework.TypeString,
+					Description: "State parameter used by web login. If used the web method is used. Optional.",
+				},
+			},
+
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.UpdateOperation:         b.pathLogin,
+				logical.AliasLookaheadOperation: b.pathLogin,
+			},
+		},
+	}
+}
+
 func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	
 	code := data.Get(googleAuthCodeParameterName).(string)
 
-  config, err := b.config(ctx, req.Storage)
+	config, err := b.config(ctx, req.Storage)
 	if err != nil {
 		return nil, err
 	}
@@ -54,20 +75,20 @@ func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *fra
 			return nil, err
 		}
 	}
-
+	
 	oauth2config := config.oauth2Config(authType)
-
+	
 	token, err := b.user.oauth2Exchange(ctx, code, oauth2config)
 	if err != nil {
 		return nil, err
 	}
 
-	user, groups, err := b.authenticate(ctx, config, token, authType)
+	user, err := b.authenticate(ctx, config, token, authType)
 	if err != nil {
 		return nil, err
 	}
 
-	if !config.authorised(user, groups) {
+	if !config.authorised(user) {
 		return logical.ErrorResponse("user is not allowed to login"), nil
 	}
 
@@ -78,23 +99,24 @@ func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *fra
 
 	ttl, maxTTL := config.ttlForType(authType)
 
-  var policies []string
-  p, err := b.User(ctx, req.Storage, user.Email)
-  if err != nil {
-    return nil, err
-  }
-  if p == nil {
-    return nil, nil
-  }
+	var policies []string
+	p, err := b.User(ctx, req.Storage, user.Email)
+	if err != nil {
+		return nil, err
+	}
+	if p == nil {
+		policies = []string{"default"}
+	} else {
+		policies = p.Policies
+	}
 
-  policies = p.Policies
 	resp := &logical.Response{
 		Auth: &logical.Auth{
 			InternalData: map[string]interface{}{
 				"token": encodedToken,
 				"type":  authType,
 			},
-      Policies: policies,
+			Policies: policies,
 			Metadata: map[string]string{
 				"username": user.Email,
 				"domain":   user.Hd,
@@ -117,9 +139,6 @@ func (b *backend) pathLogin(ctx context.Context, req *logical.Request, data *fra
 		},
 	}
 
-  //need to map policies here resp.Auth.Policies []string `json:"policies" mapstructure:"policies" structs:"policies"`
-	setGroups(resp.Auth, user, groups)
-
 	return resp, nil
 }
 
@@ -141,57 +160,27 @@ func (b *backend) pathRenew(ctx context.Context, req *logical.Request, d *framew
 
 	authType, ok := req.Auth.InternalData["type"].(string)
 
-	user, groups, err := b.authenticate(ctx, config, token, authType)
+	user, err := b.authenticate(ctx, config, token, authType)
 	if err != nil {
 		return nil, err
 	}
 
-	if !config.authorised(user, groups) {
+	if !config.authorised(user) {
 		return logical.ErrorResponse("user is not allowed to login"), nil
 	}
 
 	resp := &logical.Response{Auth: req.Auth}
 
-	// Remove old aliases
-	resp.Auth.GroupAliases = nil
-
-	setGroups(resp.Auth, user, groups)
-
 	return resp, nil
 }
 
-func setGroups(auth *logical.Auth, user *goauth.Userinfo, groups []*admin.Group) {
-	// add every associated group
-	for _, group := range groups {
-		auth.GroupAliases = append(auth.GroupAliases, &logical.Alias{
-			Name: group.Email,
-			Metadata: map[string]string{
-				"name":        group.Name,
-				"aliases":     strings.Join(group.Aliases, ","),
-				"description": group.Description,
-			},
-		})
-	}
-
-	// add a group alias for it's domain
-	auth.GroupAliases = append(auth.GroupAliases, &logical.Alias{
-		Name: fmt.Sprintf("@%s", user.Hd),
-	})
-}
-
-func (b *backend) authenticate(ctx context.Context, config *config, token *oauth2.Token, authType string) (*goauth.Userinfo, []*admin.Group, error) {
+func (b *backend) authenticate(ctx context.Context, config *config, token *oauth2.Token, authType string) (*goauth.Userinfo, error) {
 	oauth2config := config.oauth2Config(authType)
 
 	user, err := b.user.authUser(ctx, oauth2config, token)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	groups, err := b.groups.groupsPerUser(ctx, config, user.Email)
-	if err != nil {
-		b.Logger().Warn("querying the admin directory API for the groups for the user failed: ", "user", user, "error", "err")
-		groups = []*admin.Group{}
-	}
-
-	return user, groups, nil
+	return user, nil
 }

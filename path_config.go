@@ -1,3 +1,4 @@
+//Credit to https://github.com/simonswine/vault-plugin-auth-google
 package google
 
 import (
@@ -11,7 +12,7 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/admin/directory/v1"
+
 	goauth "google.golang.org/api/oauth2/v2"
 
 	"github.com/hashicorp/vault/sdk/framework"
@@ -31,12 +32,26 @@ const (
 	webRedirectURLConfigPropertyName             = "web_redirect_url"
 	webTTLConfigPropertyName                     = "web_ttl"
 	webMaxTTLConfigPropertyName                  = "web_max_ttl"
-	directoryServiceAccountKeyConfigPropertyName = "directory_service_account_key"
-	directoryImpersonateUserConfigPropertyName   = "directory_impersonate_user"
 	allowedUsersConfigPropertyName               = "allowed_users"
 	allowedGroupsConfigPropertyName              = "allowed_groups"
 	allowedDomainsConfigPropertyName             = "allowed_domains"
 )
+
+
+func (b *backend) pathConfig() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "config",
+			Fields:  configPathFields(),
+
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.UpdateOperation: b.pathConfigWrite,
+				logical.ReadOperation:   b.pathConfigRead,
+			},
+		},
+	}
+}
+
 
 func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	// get potentially existing config
@@ -88,13 +103,6 @@ func (b *backend) config(ctx context.Context, s logical.Storage) (*config, error
 		return nil, fmt.Errorf("error reading configuration: %s", err)
 	}
 
-	/*
-		result.WebTTL /= time.Second
-		result.WebMaxTTL /= time.Second
-		result.CLITTL /= time.Second
-		result.CLIMaxTTL /= time.Second
-	*/
-
 	return &result, nil
 }
 
@@ -108,12 +116,11 @@ type config struct {
 	WebRedirectURL             string        `json:"web_redirect_url" description:"Google redirect URL for Web oauth2"`
 	WebTTL                     time.Duration `json:"web_ttl" description:"Duration after which web authentication will be expired"`
 	WebMaxTTL                  time.Duration `json:"web_max_ttl" description:"Maximum duration after web which authentication will be expired"`
-	DirectoryServiceAccounyKey string        `json:"directory_service_account_key" secret:"true" description:"Google Service Account for Directory Group lookups"`
-	DirectoryImpersonateUser   string        `json:"directory_impersonate_user" description:"Google Admin User to Impersonate for Directory Group lookups"`
 	AllowedUsers               []string      `json:"allowed_users"`
-	AllowedGroups              []string      `json:"allowed_groups"`
 	AllowedDomains             []string      `json:"allowed_domains"`
 }
+
+
 
 func configPathFields() map[string]*framework.FieldSchema {
 	output := make(map[string]*framework.FieldSchema)
@@ -290,11 +297,11 @@ func (c *config) ttlForType(authType string) (ttl time.Duration, maxTTL time.Dur
 	return ttl, maxTTL
 }
 
-func (c *config) authorised(user *goauth.Userinfo, groups []*admin.Group) bool {
+func (c *config) authorised(user *goauth.Userinfo) bool {
 
-	// base case, no restrictions configured
-	if (len(c.AllowedDomains) + len(c.AllowedGroups) + len(c.AllowedUsers)) == 0 {
-		return true
+	// base case, no auth
+	if (len(c.AllowedDomains) + len(c.AllowedUsers)) == 0 {
+		return false
 	}
 
 	stringInSliceCaseInsensitive := func(s string, slice []string) bool {
@@ -315,20 +322,6 @@ func (c *config) authorised(user *goauth.Userinfo, groups []*admin.Group) bool {
 	// allowed by users
 	if stringInSliceCaseInsensitive(user.Email, c.AllowedUsers) {
 		return true
-	}
-
-	// list of groups and aliases of the user
-	userGroups := []string{}
-	for _, group := range groups {
-		userGroups = append(userGroups, group.Email)
-		userGroups = append(userGroups, group.Aliases...)
-	}
-
-	// check if any allowed group matches
-	for _, allowedGroup := range c.AllowedGroups {
-		if stringInSliceCaseInsensitive(allowedGroup, userGroups) {
-			return true
-		}
 	}
 
 	return false

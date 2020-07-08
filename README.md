@@ -2,9 +2,13 @@
 
 A HashiCorp Vault plugin for Google Auth.
 
-## Setup
+This fork supports direct mapping of policies to users. If domain or
+user to allowed_ it will map the policy=default automatically.
+("default" policy is built-in to vault)
 
-NOTE: This is a work-in-progress/cleanup.
+directory service/google group usage has been removed
+
+## Setup
 
 The setup guide assumes some familiarity with Vault and Vault's plugin
 ecosystem. You must have a Vault server already running, unsealed, and
@@ -15,31 +19,32 @@ authenticated.
 2. Move the compiled plugin into Vault's configured `plugin_directory`:
 
    ```sh
-   $ mv google-auth-vault-plugin /etc/vault/plugins/google-auth-vault-plugin
+   $ mv vault-plugin-auth-google /etc/vault/plugins/vault-plugin-auth-google
    ```
 
-1. Calculate the SHA256 of the plugin and register it in Vault's plugin catalog.
+3. Calculate the SHA256 of the plugin and register it in Vault's plugin catalog.
 If you are downloading the pre-compiled binary, it is highly recommended that
 you use the published checksums to verify integrity.
 
    ```sh
-   $ export SHA256=$(shasum -a 256 "/etc/vault/plugins/google-auth-vault-plugin" | cut -d' ' -f1)
-   $ vault write sys/plugins/catalog/auth/google-auth-vault-plugin \
+   $ export SHA256=$(shasum -a 256 "/etc/vault/plugins/vault-plugin-auth-google" | cut -d' ' -f1)
+   $ vault write sys/plugins/catalog/auth/vault-plugin-auth-google \
        sha_256="${SHA256}" \
-       command="google-auth-vault-plugin"
+       command="vault-plugin-auth-google"
    ```
 
-1. Mount the auth method:
-   #(Had to enable in both paths at the moment. This entire plugin needs a rewrite.)
+4. Mount the auth method:
+
+   #(Had to enable in both paths at the moment)
    ```sh
    $ vault auth enable \
        -path="google" \
-       -plugin-name="google-auth-vault-plugin" plugin
+       -plugin-name="vault-plugin-auth-google" plugin
    ```
    ```sh
    $ vault auth enable \
        -path="auth/google" \
-       -plugin-name="google-auth-vault-plugin" plugin   
+       -plugin-name="vault-plugin-auth-google" plugin   
    ``` 
    ```sh
    $ vault read auth/google/config
@@ -53,8 +58,6 @@ you use the published checksums to verify integrity.
     cli_client_secret                <redacted>
     cli_max_ttl                      0s
     cli_ttl                          0s
-    directory_impersonate_user       n/a
-    directory_service_account_key    n/a
     web_client_id                    <>
     web_client_secret                <redacted>
     web_max_ttl                      0s
@@ -68,7 +71,7 @@ you use the published checksums to verify integrity.
 
   The Google credential provider allows you to authenticate with Google.
 
-  Documentation can be found at https://github.com/noname8753/google-auth-vault-plugin.
+  Documentation can be found at https://github.com/noname8753/vault-plugin-auth-google.
 
   ## PATHS
 
@@ -87,20 +90,19 @@ you use the published checksums to verify integrity.
 
 
     ^users/(?P<name>.+)$
-        Manage additional groups for users allowed to authenticate.
+        Map username/email to policy.
+        vault write auth/google/users/someuser@someemail.com policies=default
 
     ^users/?$
-        Manage additional groups for users allowed to authenticate.
+        This endpoint allows you to create, read, update, and delete configuration
 
     ^web_code_url$
 
   ```
 
+5. Create an OAuth client ID in [the Google Cloud Console](https://console.cloud.google.com/apis/credentials), of type "Other".
 
-
-1. Create an OAuth client ID in [the Google Cloud Console](https://console.cloud.google.com/apis/credentials), of type "Other".
-
-1. Configure the auth method:
+6. Configure the auth method:
 
    ```sh
    $ vault write auth/google/config \
@@ -115,24 +117,25 @@ you use the published checksums to verify integrity.
    ```
 
 
-1. Allow domains/users
+7. Allow domains/users -> You do not have to set allowed_domains AND add a user from said domain to allowed_users
   ```sh
-  vault write auth/google/config allowed_domains="someemail.com"
+  vault write auth/google/config allowed_domains="someotherdomain.com"
   vault write auth/google/config allowed_users="someuser@someemail.com"
 
-  ``` 
-1. Set allowed callback (if using web redirect/compliing the webui with the patches) - Optional
+  ```
+
+8. Set allowed callback (if using web redirect/compliing the webui with the patches) - Optional
   ```sh
   vault write auth/google/config web_redirect_url="http://127.0.0.1:8200"
   ```
 
-1. Write a policy
+8. Write a policy
 
   ```sh
   vault policy write admin admin-policy.hcl
   ```
 
-1. Attach said policy to user
+9. Attach said policy to user
 
   ```sh
   vault write auth/google/users/someuser@ssomeemail.com policies=admin
@@ -144,7 +147,7 @@ you use the published checksums to verify integrity.
 
 
 
-1. Login using Google credentials (NB we use `open` to navigate to the Google Auth URL to get the code).
+10. Login using Google credentials (NB we use `open` to navigate to the Google Auth URL to get the code).
    (No token is returned if user has no attached policy)
 
    ```sh

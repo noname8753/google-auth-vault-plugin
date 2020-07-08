@@ -1,3 +1,4 @@
+//Credit to https://github.com/simonswine/vault-plugin-auth-google
 package google
 
 import (

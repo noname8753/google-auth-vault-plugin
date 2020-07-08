@@ -12,7 +12,6 @@ import (
 	logicaltest "github.com/hashicorp/vault/helper/testhelpers/logical"
 	"github.com/hashicorp/vault/sdk/logical"
 	"golang.org/x/oauth2"
-	"google.golang.org/api/admin/directory/v1"
 	goauth "google.golang.org/api/oauth2/v2"
 )
 
@@ -32,7 +31,7 @@ func newTestBackend() (*backend, error) {
 	return b.(*backend), err
 }
 
-func newTestBackendMocked(t *testing.T) (*gomock.Controller, *MockUserProvider, *MockGroupsProvider, *backend) {
+func newTestBackendMocked(t *testing.T) (*gomock.Controller, *MockUserProvider, *backend) {
 	b, err := newTestBackend()
 	if err != nil {
 		t.Fatalf("Unable to create backend: %s", err)
@@ -41,11 +40,9 @@ func newTestBackendMocked(t *testing.T) (*gomock.Controller, *MockUserProvider, 
 	ctrl := gomock.NewController(t)
 
 	userMock := NewMockUserProvider(ctrl)
-	groupsMock := NewMockGroupsProvider(ctrl)
 	b.user = userMock
-	b.groups = groupsMock
 
-	return ctrl, userMock, groupsMock, b
+	return ctrl, userMock, b
 }
 
 // test if we get errors and/or code URL based on endpoint
@@ -109,7 +106,7 @@ func TestBackend_CodeURL(t *testing.T) {
 		cliClientSecretConfigPropertyName: "",
 		webClientIDConfigPropertyName:     "web-id",
 		webClientSecretConfigPropertyName: "web-secret",
-		webRedirectURLConfigPropertyName:  "https://thefuck.com/callback",
+		webRedirectURLConfigPropertyName:  "https://somewhereoutthere.com/callback",
 	}
 
 	webFine := testCodeURLRead(t, webCodeURLPath, false, func(resp *logical.Response) error {
@@ -136,7 +133,7 @@ func TestBackend_CodeURL(t *testing.T) {
 		if exp, act := "web-id", u.Query().Get("client_id"); exp != act {
 			t.Errorf("unexpected client id in url: exp=%s act=%s", exp, act)
 		}
-		if exp, act := "https://thefuck.com/callback/ui/vault/auth/google/callback/google", u.Query().Get("redirect_uri"); exp != act {
+		if exp, act := "https://somewhereoutthere.com/callback/ui/vault/auth/google/callback/google", u.Query().Get("redirect_uri"); exp != act {
 			t.Errorf("unexpected redirect uri in url: exp=%s act=%s", exp, act)
 		}
 		return nil
@@ -147,7 +144,7 @@ func TestBackend_CodeURL(t *testing.T) {
 		cliClientSecretConfigPropertyName: "cli-secret",
 		webClientIDConfigPropertyName:     "web-id",
 		webClientSecretConfigPropertyName: "web-secret",
-		webRedirectURLConfigPropertyName:  "https://thefuck.com/callback",
+		webRedirectURLConfigPropertyName:  "https://somewhereoutthere.com/callback",
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
@@ -222,7 +219,7 @@ func testConfigRead(t *testing.T, expects ...expectFunc) logicaltest.TestStep {
 
 // test the full login flow
 func TestBackend_Login(t *testing.T) {
-	ctrl, userMock, groupsMock, b := newTestBackendMocked(t)
+	ctrl, userMock, b := newTestBackendMocked(t)
 	defer ctrl.Finish()
 
 	configData := map[string]interface{}{
@@ -234,7 +231,7 @@ func TestBackend_Login(t *testing.T) {
 		webMaxTTLConfigPropertyName:       "22m",
 		webClientIDConfigPropertyName:     "web-id",
 		webClientSecretConfigPropertyName: "web-secret",
-		webRedirectURLConfigPropertyName:  "https://thefuck.com/callback",
+		webRedirectURLConfigPropertyName:  "https://somewhereoutthere.com/callback",
 	}
 
 	checkConfigRead := testConfigRead(
@@ -265,20 +262,11 @@ func TestBackend_Login(t *testing.T) {
 		FamilyName: "Webber",
 		GivenName:  "Web M.",
 	}
-	webGroups := []*admin.Group{
-		&admin.Group{
-			Name:  "Group with both",
-			Email: "both@my.com",
-		},
-		&admin.Group{
-			Name:  "Web only",
-			Email: "web@my.com",
-		},
-	}
+
 
 	userMock.EXPECT().oauth2Exchange(gomock.Any(), gomock.Eq("my-web-code"), webClientIDMatcher).Times(1).Return(webToken, nil)
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(webToken)).Times(1).Return(webUser, nil)
-	groupsMock.EXPECT().groupsPerUser(gomock.Any(), gomock.Any(), gomock.Eq("me-web@my.com")).Times(1).Return(webGroups, nil)
+
 
 	var webState = &struct{ State string }{}
 	webStateAndURL := testCodeURLRead(t, webCodeURLPath, false, func(resp *logical.Response) error {
@@ -314,22 +302,12 @@ func TestBackend_Login(t *testing.T) {
 		FamilyName: "Clier",
 		GivenName:  "Cli M.",
 	}
-	cliGroups := []*admin.Group{
-		&admin.Group{
-			Name:  "Group with both",
-			Email: "both@my.com",
-		},
-		&admin.Group{
-			Name:  "CLI only",
-			Email: "cli@my.com",
-		},
-	}
 
 	userMock.EXPECT().oauth2Exchange(gomock.Any(), gomock.Eq("my-cli-code"), cliClientIDMatcher).Times(1).Return(cliToken, nil)
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(cliToken)).Times(1).Return(cliUser, nil)
 	userMock.EXPECT().oauth2Exchange(gomock.Any(), gomock.Eq("my-cli-code-nostate"), cliClientIDMatcher).Times(1).Return(cliTokenNoState, nil)
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(cliTokenNoState)).Times(1).Return(cliUser, nil)
-	groupsMock.EXPECT().groupsPerUser(gomock.Any(), gomock.Any(), gomock.Eq("me-cli@my.com")).Times(2).Return(cliGroups, nil)
+
 
 	var cliState = &struct{ State string }{}
 	cliFine := testCodeURLRead(t, cliCodeURLPath, false, func(resp *logical.Response) error {
@@ -382,24 +360,11 @@ func TestBackend_Login(t *testing.T) {
 
 }
 
-// tests the group, user, domain authorisation as part of the login
+// tests the user, domain authorisation as part of the login
 func TestBackend_LoginAuthorisation(t *testing.T) {
-	ctrl, userMock, groupsMock, b := newTestBackendMocked(t)
+	ctrl, userMock, b := newTestBackendMocked(t)
 	defer ctrl.Finish()
 
-	groupA := &admin.Group{
-		Name:  "Group A",
-		Email: "group-a@a.com",
-	}
-	groupAB := &admin.Group{
-		Name:  "Group AB",
-		Email: "group-ab@a.com",
-	}
-	groupABC := &admin.Group{
-		Name:    "Group ABC",
-		Email:   "group-abc@a.com",
-		Aliases: []string{"team-abc@a.com"},
-	}
 
 	userA := &goauth.Userinfoplus{
 		Email: "a@a.com",
@@ -420,13 +385,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(&oauth2.Token{AccessToken: userA.Email})).AnyTimes().Return(userA, nil)
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(&oauth2.Token{AccessToken: userB.Email})).AnyTimes().Return(userB, nil)
 	userMock.EXPECT().authUser(gomock.Any(), gomock.Any(), gomock.Eq(&oauth2.Token{AccessToken: userC.Email})).AnyTimes().Return(userC, nil)
-
-	groupsUserA := []*admin.Group{groupA, groupAB, groupABC}
-	groupsUserB := []*admin.Group{groupAB, groupABC}
-	groupsUserC := []*admin.Group{groupABC}
-	groupsMock.EXPECT().groupsPerUser(gomock.Any(), gomock.Any(), gomock.Eq(userA.Email)).AnyTimes().Return(groupsUserA, nil)
-	groupsMock.EXPECT().groupsPerUser(gomock.Any(), gomock.Any(), gomock.Eq(userB.Email)).AnyTimes().Return(groupsUserB, nil)
-	groupsMock.EXPECT().groupsPerUser(gomock.Any(), gomock.Any(), gomock.Eq(userC.Email)).AnyTimes().Return(groupsUserC, nil)
 
 	loginUser := func(u *goauth.Userinfoplus, success bool) logicaltest.TestStep {
 		var checks []expectFunc
@@ -449,8 +407,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 	configData := map[string]interface{}{
 		cliClientIDConfigPropertyName:                "cli-id",
 		cliClientSecretConfigPropertyName:            "cli-secret",
-		directoryImpersonateUserConfigPropertyName:   "myadmin@user.com",
-		directoryServiceAccountKeyConfigPropertyName: "secret",
 	}
 
 	logicaltest.Test(t, logicaltest.TestCase{
@@ -465,7 +421,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 			testConfigWrite(t, map[string]interface{}{
 				allowedUsersConfigPropertyName:   "user-not@existing.net",
 				allowedDomainsConfigPropertyName: "",
-				allowedGroupsConfigPropertyName:  "",
 			}),
 			loginUser(userA, false),
 			loginUser(userB, false),
@@ -473,7 +428,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 			testConfigWrite(t, map[string]interface{}{
 				allowedUsersConfigPropertyName:   userC.Email,
 				allowedDomainsConfigPropertyName: userA.Hd,
-				allowedGroupsConfigPropertyName:  "",
 			}),
 			loginUser(userA, true),
 			loginUser(userB, false),
@@ -481,7 +435,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 			testConfigWrite(t, map[string]interface{}{
 				allowedUsersConfigPropertyName:   "",
 				allowedDomainsConfigPropertyName: "",
-				allowedGroupsConfigPropertyName:  strings.Join([]string{groupA.Email, groupAB.Email}, ","),
 			}),
 			loginUser(userA, true),
 			loginUser(userB, true),
@@ -489,7 +442,6 @@ func TestBackend_LoginAuthorisation(t *testing.T) {
 			testConfigWrite(t, map[string]interface{}{
 				allowedUsersConfigPropertyName:   "",
 				allowedDomainsConfigPropertyName: "",
-				allowedGroupsConfigPropertyName:  groupABC.Aliases[0],
 			}),
 			loginUser(userA, true),
 			loginUser(userB, true),

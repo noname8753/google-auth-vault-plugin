@@ -7,55 +7,54 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func pathUsersList(b *backend) *framework.Path {
-	return &framework.Path{
-		Pattern: "users/?$",
+func (b *backend) pathUsersList() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: "users/?$",
 
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ListOperation: b.pathUserList,
-		},
-
-		HelpSynopsis:    pathUserHelpSyn,
-		HelpDescription: pathUserHelpDesc,
-		DisplayAttrs: &framework.DisplayAttributes{
-			Navigation: true,
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ListOperation: b.pathUserList,
+			},
+	
+			HelpSynopsis:    pathUserReadHelpSyn,
+			HelpDescription: pathUserHelpDesc,
+			DisplayAttrs: &framework.DisplayAttributes{
+				Navigation: true,
+			},
 		},
 	}
 }
 
-func pathUsers(b *backend) *framework.Path {
-	return &framework.Path{
-		Pattern: `users/(?P<name>.+)`,
-		Fields: map[string]*framework.FieldSchema{
-			"name": &framework.FieldSchema{
-				Type:        framework.TypeString,
-				Description: "Name of the user.",
+func (b *backend) pathUsers() []*framework.Path {
+	return []*framework.Path{
+		{
+			Pattern: `users/(?P<name>.+)`,
+			Fields: map[string]*framework.FieldSchema{
+				"name": &framework.FieldSchema{
+					Type:        framework.TypeString,
+					Description: "Name of the user.",
+				},
+				"policies": &framework.FieldSchema{
+					Type:        framework.TypeCommaStringSlice,
+					Description: "List of policies associated with the user.",
+				},
 			},
-
-			"groups": &framework.FieldSchema{
-				Type:        framework.TypeCommaStringSlice,
-				Description: "List of groups associated with the user.",
+	
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.DeleteOperation: b.pathUserDelete,
+				logical.ReadOperation:   b.pathUserRead,
+				logical.UpdateOperation: b.pathUserWrite,
 			},
-
-			"policies": &framework.FieldSchema{
-				Type:        framework.TypeCommaStringSlice,
-				Description: "List of policies associated with the user.",
+	
+			HelpSynopsis:    pathUserHelpSyn,
+			HelpDescription: pathUserHelpDesc,
+			DisplayAttrs: &framework.DisplayAttributes{
+				Action:   "Create",
 			},
-		},
-
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.DeleteOperation: b.pathUserDelete,
-			logical.ReadOperation:   b.pathUserRead,
-			logical.UpdateOperation: b.pathUserWrite,
-		},
-
-		HelpSynopsis:    pathUserHelpSyn,
-		HelpDescription: pathUserHelpDesc,
-		DisplayAttrs: &framework.DisplayAttributes{
-			Action:   "Create",
 		},
 	}
 }
+
 
 func (b *backend) User(ctx context.Context, s logical.Storage, n string) (*UserEntry, error) {
 	entry, err := s.Get(ctx, "user/"+n)
@@ -104,7 +103,6 @@ func (b *backend) pathUserRead(ctx context.Context, req *logical.Request, d *fra
 
 	return &logical.Response{
 		Data: map[string]interface{}{
-			"groups":   user.Groups,
 			"policies": user.Policies,
 		},
 	}, nil
@@ -116,12 +114,11 @@ func (b *backend) pathUserWrite(ctx context.Context, req *logical.Request, d *fr
 		return logical.ErrorResponse("Error empty name"), nil
 	}
 
-	groups := d.Get("groups").([]string)
+
 	policies := d.Get("policies").([]string)
 
 	// Store it
 	entry, err := logical.StorageEntryJSON("user/"+name, &UserEntry{
-		Groups:   groups,
 		Policies: policies,
 	})
 	if err != nil {
@@ -142,18 +139,36 @@ func (b *backend) pathUserList(ctx context.Context, req *logical.Request, d *fra
 	return logical.ListResponse(users), nil
 }
 
+
 type UserEntry struct {
-	Groups   []string
 	Policies []string
 }
+
+const pathUserReadHelpSyn = `
+List users 
+vault list auth/google/users
+
+vault read auth/google/users/someuser@someemail.com
+
+Key         Value
+---         -----
+policies    [admin]
+
+`
 
 const pathUserHelpSyn = `
 Map username/email to policy.
 vault write auth/google/users/someuser@someemail.com policies=default
+or multiple:
+vault write auth/google/users/someuser@someemail.com policies=default,admin,specialaccess
 `
 
 const pathUserHelpDesc = `
 This endpoint allows you to create, read, update, and delete configuration
 
-Deleting a user will not revoke their auth.
+Deleting a user will not revoke their existing auth.
+
+vault list auth/token/accessors
+
+
 `
