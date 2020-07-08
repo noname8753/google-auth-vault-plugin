@@ -1,9 +1,10 @@
 #!/bin/bash
 #change to know if you want other vault builtin auth methods to display in ui
 disableOtherAuths="yes"
+integratePlugin="yes"
 echo "Building Vault"
 
-docker build ../ -f ../Dockerfile.vault --tag vault-google:build --build-arg disableOtherAuths="$disableOtherAuths"
+docker build ../ -f ../Dockerfile.vault --tag vault-google:build --build-arg disableOtherAuths="$disableOtherAuths" --build-arg integratePlugin="$integratePlugin"
 docker container create --name vault-google-extract-build vault-google:build
 mkdir -p ../bin/
 

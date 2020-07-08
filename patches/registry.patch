@@ -1,0 +1,18 @@
+--- registry.go.1	2020-07-08 14:26:37.901687324 -0700
++++ registry.go	2020-07-08 14:29:49.604355212 -0700
+@@ -32,6 +32,7 @@
+ 	"github.com/hashicorp/vault/sdk/database/helper/credsutil"
+ 	"github.com/hashicorp/vault/sdk/helper/consts"
+ 	"github.com/hashicorp/vault/sdk/logical"
++	credGoogle "github.com/noname8753/vault-plugin-auth-google"
+ 
+ 	logicalAd "github.com/hashicorp/vault-plugin-secrets-ad/plugin"
+ 	logicalAlicloud "github.com/hashicorp/vault-plugin-secrets-alicloud"
+@@ -89,6 +90,7 @@
+ 			"pcf":        credCF.Factory, // Deprecated.
+ 			"radius":     credRadius.Factory,
+ 			"userpass":   credUserpass.Factory,
++			"google":     credGoogle.Factory,
+ 		},
+ 		databasePlugins: map[string]BuiltinFactory{
+ 			// These four plugins all use the same mysql implementation but with
